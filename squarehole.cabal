@@ -1,0 +1,39 @@
+cabal-version:      3.0
+name:               squarehole
+version:            0.0.0.1
+synopsis:           It goes in the square hole.
+-- description:
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             Zoe Zuser
+maintainer:         zmzuser@gmail.com
+copyright:          2024
+category:           Control
+build-type:         Simple
+
+extra-doc-files:    CHANGELOG.md
+
+common language
+    default-language: Haskell2010
+    -- default-extensions:
+
+common common-deps
+    build-depends:    base ^>=4.17.2.1
+
+common warnings
+    ghc-options: -Wall
+
+library
+    import:           language, common-deps, warnings
+    hs-source-dirs:   src
+    exposed-modules:  Control.Monad.SquareHole
+    -- other-modules:
+
+test-suite squarehole-test
+    import:           language, common-deps, warnings
+    hs-source-dirs:   test
+    main-is:          Main.hs
+    type:             exitcode-stdio-1.0
+    -- other-modules:
+    build-depends:
+        squarehole
