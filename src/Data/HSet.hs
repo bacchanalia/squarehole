@@ -12,6 +12,7 @@ import Type.Reflection (SomeTypeRep, Typeable, someTypeRep)
 import Unsafe.Coerce (unsafeCoerce)
 import Text.Show
 import Data.Functor.Identity
+import Data.Hashable
 
 newtype HSet (as :: [Type]) = HSet { getHSet :: HashMap SomeTypeRep Any }
 
@@ -72,17 +73,8 @@ type family Union' (b :: Bool) (as :: [k]) (bs :: [k]) :: [k] where
   Union' False as (b : bs) = b : Union as bs
   Union' True  as (b : bs) = Union as bs
 
-unionTLVL :: ∀ as bs. HSet as -> HSet bs -> HSet (Union as bs)
-unionTLVL (HSet l) (HSet r) = HSet $ Map.union l r
-
-unionTLVR :: ∀ as bs. HSet as -> HSet bs -> HSet (Union as bs)
-unionTLVR (HSet l) (HSet r) = HSet $ Map.union r l
-
-unionTRVL :: ∀ as bs. HSet as -> HSet bs -> HSet (Union bs as)
-unionTRVL (HSet l) (HSet r) = HSet $ Map.union l r
-
-unionTRVR :: ∀ as bs. HSet as -> HSet bs -> HSet (Union bs as)
-unionTRVR (HSet l) (HSet r) = HSet $ Map.union r l
+union :: ∀ as bs. HSet as -> HSet bs -> HSet (Union as bs)
+union (HSet l) (HSet r) = HSet $ Map.union l r
 
 type family (x :: Bool) ^&& (y :: Bool) :: Bool where
   True ^&& True = True
@@ -126,11 +118,11 @@ delete _ m = HSet $ Map.delete (someTypeRep (Proxy @a)) (coerce m)
 isSubsetOf :: ∀ s1 s2 as bs b. (b ~ Subset as bs, DemoteBool b) => s1 as -> s2 bs -> Bool
 isSubsetOf _ _ = demoteBool (Proxy @(Subset as bs))
 
-class K a
-instance K a
+class Trivial a
+instance Trivial a
 
-difference :: ∀ proxy as bs. HFoldr K bs => HSet as -> proxy bs -> HSet (Difference as bs)
-difference (HSet m) _ = HSet $ Map.difference m (hmap @K (const ()) (HSet Map.empty :: HSet bs))
+difference :: ∀ proxy as bs. HFoldr Trivial bs => HSet as -> proxy bs -> HSet (Difference as bs)
+difference (HSet m) _ = HSet $ Map.difference m (hmap @Trivial (const ()) (HSet Map.empty :: HSet bs))
 
 type family Intersection (as :: [k]) (bs :: [k]) :: [k] where
   Intersection '[]      bs       = '[]
@@ -138,17 +130,8 @@ type family Intersection (as :: [k]) (bs :: [k]) :: [k] where
   Intersection (a : as) (a : bs) = a : Intersection as bs
   Intersection (a : as) bs       = If (a ! bs) (a : Intersection as (Delete a bs)) (Intersection as bs)
 
-intersectionTLVL :: ∀ as bs. HSet as -> HSet bs -> HSet (Intersection as bs)
-intersectionTLVL (HSet a) (HSet b) = HSet $ Map.intersection a b
-
-intersectionTLVR :: ∀ as bs. HSet as -> HSet bs -> HSet (Intersection as bs)
-intersectionTLVR (HSet a) (HSet b) = HSet $ Map.intersection b a
-
-intersectionTRVL :: ∀ as bs. HSet as -> HSet bs -> HSet (Intersection bs as)
-intersectionTRVL (HSet a) (HSet b) = HSet $ Map.intersection a b
-
-intersectionTRVR :: ∀ as bs. HSet as -> HSet bs -> HSet (Intersection bs as)
-intersectionTRVR (HSet a) (HSet b) = HSet $ Map.intersection b a
+intersection :: ∀ as bs. HSet as -> HSet bs -> HSet (Intersection as bs)
+intersection (HSet a) (HSet b) = HSet $ Map.intersection a b
 
 censor :: Subset bs as ~ True => HSet as -> HSet bs
 censor = coerce
@@ -160,8 +143,7 @@ instance HFoldr cls '[] where
   hfoldr _ z _ = z
 
 instance (Typeable a, cls a, HFoldr cls as) => HFoldr cls (a : as) where
-  hfoldr f z s = f (lookup p s) (hfoldr @cls f z (censor s :: HSet as))
-    where p = Proxy @a
+  hfoldr f z s = f (lookup (Proxy @a) s) (hfoldr @cls f z (censor s :: HSet as))
 
 hmap :: ∀ cls as b. HFoldr cls as => (∀ a. cls a => a -> b) -> HSet as -> HashMap SomeTypeRep b
 hmap f = hfoldr @cls (\val -> Map.insert (someTypeRep (Identity val)) (f val)) Map.empty
@@ -169,3 +151,21 @@ hmap f = hfoldr @cls (\val -> Map.insert (someTypeRep (Identity val)) (f val)) M
 instance HFoldr Show as => Show (HSet as) where
   showsPrec _ s = showListWith showPair (Map.toList (hmap @Show shows s))
     where showPair (ty, str) = showParen True (shows ty . showChar ',' . str)
+
+class (Typeable a, cls a, a ! as ~ True) => H cls as a
+instance (Typeable a, cls a, a ! as ~ True) => H cls as a
+
+instance HFoldr (H Eq as) as => Eq (HSet as) where
+  xs == ys = hfoldr @(H Eq as) (\y acc -> acc && y == lookup (Identity y) xs) True ys
+
+instance (HFoldr (H Eq as) as, HFoldr (H Ord as) as) => Ord (HSet as) where
+  xs `compare` ys = hfoldr @(H Ord as) (\x acc -> x `compare` lookup (Identity x) ys <> acc) EQ xs
+
+instance Semigroup (HSet as) where
+  HSet l <> HSet r = HSet $ Map.union l r
+
+instance Monoid (HSet '[]) where
+  mempty = empty
+
+instance (HFoldr (H Eq as) as, HFoldr (H Hashable as) as) => Hashable (HSet as) where
+  hashWithSalt = hfoldr @(H Hashable as) (flip hashWithSalt)

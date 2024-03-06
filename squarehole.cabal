@@ -35,6 +35,7 @@ common language
       , UnicodeSyntax
       , UndecidableInstances
       , RankNTypes
+      , UndecidableSuperClasses
 
 common common-deps
     build-depends:    base ^>=4.17.2.1
@@ -51,6 +52,7 @@ library
     build-depends:
       , constraints
       , ghc-prim
+      , hashable
       , mtl
       , transformers
       , unordered-containers
