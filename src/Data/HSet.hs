@@ -11,6 +11,7 @@ import GHC.Prim (coerce)
 import Type.Reflection (SomeTypeRep, Typeable, someTypeRep)
 import Unsafe.Coerce (unsafeCoerce)
 import Text.Show
+import Data.Functor.Identity
 
 newtype HSet (as :: [Type]) = HSet { getHSet :: HashMap SomeTypeRep Any }
 
@@ -115,6 +116,7 @@ type family Difference (as :: [k]) (bs :: [k]) :: [k] where
 type family Subset (as :: [k]) (bs :: [k]) :: Bool where
   Subset '[]      bs       = True
   Subset (a : as) '[]      = False
+  Subset as       (a : as) = True
   Subset (a : as) (a : bs) = Subset as bs
   Subset (a : as) (b : bs) = (a ! bs) ^&& Subset as (b : Delete a bs)
 
@@ -124,17 +126,11 @@ delete _ m = HSet $ Map.delete (someTypeRep (Proxy @a)) (coerce m)
 isSubsetOf :: ∀ s1 s2 as bs b. (b ~ Subset as bs, DemoteBool b) => s1 as -> s2 bs -> Bool
 isSubsetOf _ _ = demoteBool (Proxy @(Subset as bs))
 
---difference :: ∀ as bs. HSet as -> HSet bs -> HSet (Difference as bs)
---difference (HSet a) (HSet b) = HSet $ Map.difference a b
+class K a
+instance K a
 
-class (Typeable a, DemoteBool (a ! bs)) => Fsh bs a
-instance (Typeable a, DemoteBool (a ! bs)) => Fsh bs a
-
-difference :: ∀ proxy as bs. HSet as -> proxy bs -> HSet (Difference as bs)
-difference s p = HSet $ hfoldr @(Fsh bs) f Map.empty s
-  where
-    f :: ∀a. Fsh bs a => SomeTypeRep -> a -> HashMap SomeTypeRep Any -> HashMap SomeTypeRep Any
-    f ty val acc = if demoteBool (Proxy @(a ! bs)) then acc else Map.insert ty (Any val) acc
+difference :: ∀ proxy as bs. HFoldr K bs => HSet as -> proxy bs -> HSet (Difference as bs)
+difference (HSet m) _ = HSet $ Map.difference m (hmap @K (const ()) (HSet Map.empty :: HSet bs))
 
 type family Intersection (as :: [k]) (bs :: [k]) :: [k] where
   Intersection '[]      bs       = '[]
@@ -158,18 +154,18 @@ censor :: Subset bs as ~ True => HSet as -> HSet bs
 censor = coerce
 
 class HFoldr (cls :: Type -> Constraint) (as :: [Type]) where
-  hfoldr :: (∀ a. cls a => SomeTypeRep -> a -> b -> b) -> b -> HSet as -> b
+  hfoldr :: (∀ a. (Typeable a, cls a) => a -> b -> b) -> b -> HSet as -> b
 
 instance HFoldr cls '[] where
   hfoldr _ z _ = z
 
 instance (Typeable a, cls a, HFoldr cls as) => HFoldr cls (a : as) where
-  hfoldr f z s = f (someTypeRep p) (lookup p s) (hfoldr @cls f z (delete p s :: HSet as))
+  hfoldr f z s = f (lookup p s) (hfoldr @cls f z (censor s :: HSet as))
     where p = Proxy @a
 
-map :: ∀ cls as b. HFoldr cls as => (∀ a. cls a => a -> b) -> HSet as -> HashMap SomeTypeRep b
-map f = hfoldr @cls (\ty val -> Map.insert ty (f val)) Map.empty
+hmap :: ∀ cls as b. HFoldr cls as => (∀ a. cls a => a -> b) -> HSet as -> HashMap SomeTypeRep b
+hmap f = hfoldr @cls (\val -> Map.insert (someTypeRep (Identity val)) (f val)) Map.empty
 
 instance HFoldr Show as => Show (HSet as) where
-  showsPrec _ s = showListWith showPair (Map.toList (map @Show shows s))
+  showsPrec _ s = showListWith showPair (Map.toList (hmap @Show shows s))
     where showPair (ty, str) = showParen True (shows ty . showChar ',' . str)
