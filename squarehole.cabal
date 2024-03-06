@@ -15,7 +15,26 @@ extra-doc-files:    CHANGELOG.md
 
 common language
     default-language: Haskell2010
-    -- default-extensions:
+    default-extensions:
+      , BlockArguments
+      , ConstraintKinds
+      , DataKinds
+      , DerivingStrategies
+      , FlexibleContexts
+      , FlexibleInstances
+      , FunctionalDependencies
+      , GADTs
+      , GeneralizedNewtypeDeriving
+      , ImportQualifiedPost
+      , MultiParamTypeClasses
+      , PolyKinds
+      , ScopedTypeVariables
+      , TypeApplications
+      , TypeFamilies
+      , TypeOperators
+      , UnicodeSyntax
+      , UndecidableInstances
+      , RankNTypes
 
 common common-deps
     build-depends:    base ^>=4.17.2.1
@@ -26,7 +45,15 @@ common warnings
 library
     import:           language, common-deps, warnings
     hs-source-dirs:   src
-    exposed-modules:  Control.Monad.SquareHole
+    exposed-modules:
+      , Data.HSet
+      , Control.Monad.SquareHole
+    build-depends:
+      , constraints
+      , ghc-prim
+      , mtl
+      , transformers
+      , unordered-containers
     -- other-modules:
 
 test-suite squarehole-test
