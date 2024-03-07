@@ -1,5 +1,5 @@
 {-|
-Module      : Data.Map.TypeLevel
+Module      : Data.Type.Map
 Description : Type level weight balanced trees.
 Copyright   : (c) Zoe Zuser, 2024
 License     : BSD-3
@@ -7,9 +7,9 @@ Maintainer  : zmzuser@gmail.com
 Stability   : experimental
 Portability : GHC only
 
-It's Data.Map at the type level.
+It's Data.Map. It's Data.Map at the type level.
+It's Data.Map implemented specially to be at the type level.
 Type level Data.Map.
-Data.Map in your types.
 
 Keys can be any type that has a type instance for 'Compare'.
 -}
@@ -19,17 +19,30 @@ module Data.Type.Map
   , Empty, Singleton
     -- ** From Lists
   , FromList, FromList'
-    -- * Inserting / Updating / Deleting
-  , Insert, Insert', Update, Delete, Delete'
+    -- * Operations on single elements
+    -- ** Insertion
+  , Insert, Insert'
+    -- ** Update
+  , Update
+    -- ** Deletion
+  , Delete, Delete'
     -- * Querying
-  , Member, Lookup, Lookup', Size
-    -- * Binary set-like operations
+    -- ** Boolean Operations
+  , Member
+    -- ** Lookup
+  , Lookup, Lookup'
+    -- ** Size
+  , Size
+    -- * Set-like Operations
   , Union, Intersection, Difference
-    -- * Folding, Mapping, Filtering
-  , FoldrWithKey, FoldrWithKeyFun
+    -- * Aggregate Operations
+    -- ** Mapping
   , MapWithKey, MapWithKeyFun
+    -- ** Folding
+  , FoldrWithKey, FoldrWithKeyFun
+    -- ** Filtering
   , FilterWithKey, FilterWithKeyFun
-    -- * Conversion
+    -- * Conversion to List
   , ToList, Keys, Elems
     -- * Utilities for making Compare instances
   , type (<>)
@@ -69,7 +82,7 @@ type family FromList' (xs :: [(k, v)]) :: Map k v where
   FromList' '[]          = Empty
   FromList' ('(k, v):xs) = Insert' k v (FromList' xs)
 
------- Inserting / Updating / Deleting
+------ Insertion/Update/Deletion
 
 -- | Insert a key and value into the map.
 -- It's a type error if the key is already in the map.
@@ -153,7 +166,7 @@ type family Size (m :: Map k v) :: Nat where
   Size Tip                 = 0
   Size (Bin s _k _v _l _r) = s
 
------- Binary set-like operations
+------ Set-like Operations
 
 -- | Left biased union.
 type family Union (l :: Map k v) (r :: Map k v) :: Map k v where
@@ -167,19 +180,21 @@ type family Intersection (l :: Map k v) (r :: Map k x) :: Map k v where
 type family Difference (l :: Map k v) (r :: Map k v) :: Map k v where
   Difference l r = FromList (SortedAssocListDifference (ToList l) (ToList r))
 
------- Folding, Mapping, Filtering
+------ Mapping/Folding/Filtering
 
-type family FoldrWithKey (f :: ix) (z :: b) (m :: Map k a) :: b where
-  FoldrWithKey f z Tip              = z
-  FoldrWithKey f z (Bin _s k v l r) = FoldrWithKey f (FoldrWithKeyFun f k v (FoldrWithKey f z r)) l
-
-type family FoldrWithKeyFun (f :: ix) (key :: k) (val :: v) (acc :: a) :: a
+---- Map
 
 type family MapWithKey (f :: ix) (m :: Map k a) :: Map k b where
   MapWithKey f Tip             = Tip
   MapWithKey f (Bin s k v l r) = Bin s k (MapWithKeyFun f k v) (MapWithKey f l) (MapWithKey f r)
 
 type family MapWithKeyFun (f :: ix) (key :: k) (val :: v) :: b
+
+type family FoldrWithKey (f :: ix) (z :: b) (m :: Map k a) :: b where
+  FoldrWithKey f z Tip              = z
+  FoldrWithKey f z (Bin _s k v l r) = FoldrWithKey f (FoldrWithKeyFun f k v (FoldrWithKey f z r)) l
+
+type family FoldrWithKeyFun (f :: ix) (key :: k) (val :: v) (acc :: a) :: a
 
 type family FilterWithKey (f :: ix) (m :: Map k a) :: Map k a where
   FilterWithKey f Tip             = Tip
@@ -216,7 +231,7 @@ type instance GT <> _r = GT
 
 ------ Internal Implementation
 
----- Internals for: Inserting / Updating / Deleting
+---- Internals for: Insertion/Update/Deletion
 
 type family BalanceL (key :: k) (val :: v) (l :: Map k v) (r :: Map k v) :: Map k v where
   BalanceL k v Tip Tip
@@ -284,8 +299,8 @@ type family BalanceR (key :: k) (val :: v) (l :: Map k v) (r :: Map k v) :: Map 
 
 type family Glue (l :: Map k v) (r :: Map k v) :: Map k v where
   Glue Tip                  Tip                  = Tip
-  Glue Tip                  r                     = r
-  Glue l                     Tip                  = l
+  Glue Tip                  r                    = r
+  Glue l                    Tip                  = l
   Glue (Bin ls lk lv ll lr) (Bin rs rk rv rl rr) = If (Compare ls rs == GT)
     (GlueR (MaxViewSure lk lv ll lr) (Bin rs rk rv rl rr))
     (GlueL (Bin ls lk lv ll lr) (MinViewSure rk rv rl rr))
@@ -312,7 +327,7 @@ type family MinViewSure (key :: k) (val :: v) (l :: Map k v) (r :: Map k v) :: V
 type family MinViewSure_ (key :: k) (val :: v) (view :: View k v) (r :: Map k v) :: View k v where
   MinViewSure_ k v ('View km vm l) r = 'View km vm (BalanceL k v l r)
 
----- Internal for: Folding, Mapping, Filtering
+---- Internal for: Mapping/Folding/Filtering
 
 type family Link (key :: k) (val :: v) (l :: Map k v) (r :: Map k v) :: Map k v where
   Link k v Tip                  r                    = InsertMin k v r
@@ -338,7 +353,7 @@ type family InsertMax (key :: k) (val :: v) (m :: Map k v) :: Map k v where
   InsertMax k v Tip                = Singleton k v
   InsertMax k v (Bin _s mk mv l r) = BalanceR mk mv l (InsertMax k v r)
 
----- Internal for: Binary set-like operations
+---- Internal for: Set-like Operations
 
 type family (xs :: [k]) ++ (ys :: [k]) :: [k] where
   '[] ++ ys    = ys
