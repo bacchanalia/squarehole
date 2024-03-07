@@ -94,8 +94,27 @@ type family SMapDelete' (k :: Symbol) (m :: SMap a) :: SMap a where
     {- EQ -} (SMapGlue l r)
     {- GT -} (SMapBalanceL mk v l (SMapDelete k r))
 
--- intersection
--- difference
+type family SMapIntersection (l :: SMap a) (r :: SMap a) :: SMap a where
+  SMapIntersection l r = SMapFromList (SortedAssocListIntersection (SMapToList l) (SMapToList r))
+
+type family SortedAssocListIntersection (xs :: [(Symbol, a)]) (ys :: [(Symbol, b)]) :: [(Symbol, a)] where
+  SortedAssocListIntersection '[]           ys            = '[]
+  SortedAssocListIntersection xs            '[]           = '[]
+  SortedAssocListIntersection ('(xk,xv):xs) ('(yk,yv):ys) = CaseCmp (CmpSymbol xk yk)
+    {- LT -} (SortedAssocListIntersection xs ('(yk,yv):ys))
+    {- EQ -} ('(xk,xv) : SortedAssocListIntersection xs ys)
+    {- GT -} (SortedAssocListIntersection ('(xk,xv):xs) ys)
+
+type family SMapDifference (l :: SMap a) (r :: SMap a) :: SMap a where
+  SMapDifference l r = SMapFromList (SortedAssocListDifference (SMapToList l) (SMapToList r))
+
+type family SortedAssocListDifference (xs :: [(Symbol, a)]) (ys :: [(Symbol, b)]) :: [(Symbol, a)] where
+  SortedAssocListDifference '[]           _ys           = '[]
+  SortedAssocListDifference xs            '[]           = xs
+  SortedAssocListDifference ('(xk,xv):xs) ('(yk,yv):ys) = CaseCmp (CmpSymbol xk yk)
+    {- LT -} ('(xk,xv) : SortedAssocListDifference xs ('(yk,yv):ys))
+    {- EQ -} (SortedAssocListDifference xs ys)
+    {- GT -} (SortedAssocListDifference ('(xk,xv):xs) ys)
 
 type family SMapBalanceL (k :: Symbol) (v :: Type) (l :: SMap a) (r :: SMap a) :: SMap a where
   SMapBalanceL k v STip STip
