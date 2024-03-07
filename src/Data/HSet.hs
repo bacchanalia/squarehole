@@ -16,34 +16,88 @@ import Data.Hashable
 import GHC.TypeNats
 import GHC.TypeLits
 
-data SMap = STip | SBin Nat Symbol Type SMap SMap
+data SMap a = STip | SBin Nat Symbol a (SMap a) (SMap a)
 
-type family SMapSize (m :: SMap) :: Nat where
+type SMapEmpty = STip
+type SMapSingleton k v = SBin 1 k v STip STip
+
+type family SMapSize (m :: SMap a) :: Nat where
   SMapSize STip                 = 0
   SMapSize (SBin s _k _v _l _r) = s
 
-type family SMapMember (k :: Symbol) (m :: SMap) :: Bool where
+type family SMapMember (k :: Symbol) (m :: SMap a) :: Bool where
   SMapMember k STip                = False
   SMapMember k (SBin _s mk _v l r) = CaseCmp (CmpSymbol k mk)
     {- LT -} (SMapMember k l)
     {- EQ -} True
     {- GT -} (SMapMember k r)
 
-type family SMapLookup (k :: Symbol) (m :: SMap) :: Maybe Type where
+type family SMapLookup (k :: Symbol) (m :: SMap a) :: Maybe a where
   SMapLookup _k STip               = Nothing
   SMapLookup k  (SBin _s mk v l r) = CaseCmp (CmpSymbol k mk)
     {- LT -} (SMapLookup k l)
     {- EQ -} (Just v)
     {- GT -} (SMapLookup k r)
 
-type family SMapInsert (k :: Symbol) (v :: Type) (m :: SMap) :: SMap where
-  SMapInsert k v STip               = SBin 1 k v STip STip
-  SMapInsert k v (SBin  s  k _v l r) = SBin s k v l r
-  SMapInsert k v (SBin _s mk mv l r) = If (CmpSymbol k mk == LT)
-      (SMapBalanceL mk mv (SMapInsert k v l) r)
-      (SMapBalanceR mk mv l (SMapInsert k v r))
+type family SMapLookup' (k :: Symbol) (m :: SMap a) :: a where
+  SMapLookup' k  (SBin _s mk v l r) = CaseCmp (CmpSymbol k mk)
+    {- LT -} (SMapLookup' k l)
+    {- EQ -} v
+    {- GT -} (SMapLookup' k r)
 
-type family SMapBalanceL (k :: Symbol) (v :: Type) (l :: SMap) (r :: SMap) :: SMap where
+type family SMapInsert (k :: Symbol) (v :: a) (m :: SMap a) :: SMap a where
+  SMapInsert k v STip               = SMapSingleton k v
+  SMapInsert k v (SBin s mk mv l r) = CaseCmp (CmpSymbol k mk)
+    {- LT -} (SMapBalanceL mk mv (SMapInsert k v l) r)
+    {- EQ -} (SBin s k v l r)
+    {- GT -} (SMapBalanceR mk mv l (SMapInsert k v r))
+
+type family SMapInsert' (k :: Symbol) (v :: a) (m :: SMap a) :: SMap a where
+  SMapInsert' k v STip               = SMapSingleton k v
+  SMapInsert' k v (SBin s mk mv l r) = CaseCmpNE (CmpSymbol k mk)
+    {- LT -} (SMapBalanceL mk mv (SMapInsert k v l) r)
+    {- GT -} (SMapBalanceR mk mv l (SMapInsert k v r))
+
+type family SMapFromList (xs :: [(Symbol, a)]) :: SMap a where
+  SMapFromList '[]          = SMapEmpty
+  SMapFromList ('(k, v):xs) = SMapInsert k v (SMapFromList xs)
+
+type family SMapFromList' (xs :: [(Symbol, a)]) :: SMap a where
+  SMapFromList' '[]          = SMapEmpty
+  SMapFromList' ('(k, v):xs) = SMapInsert' k v (SMapFromList' xs)
+
+type family SMapToList (m :: SMap a) :: [(Symbol, a)] where
+  SMapToList STip              = '[]
+  SMapToList (SBin _s k v l r) = SMapToList l ++ '[ '(k, v)] ++ SMapToList r
+
+type family SMapKeys (m :: SMap a) :: [Symbol] where
+  SMapKeys STip               = '[]
+  SMapKeys (SBin _s k _v l r) = SMapKeys l ++ '[k] ++ SMapKeys r
+
+type family SMapElems (m :: SMap a) :: [Symbol] where
+  SMapElems STip               = '[]
+  SMapElems (SBin _s _k v l r) = SMapElems l ++ '[v] ++ SMapElems r
+
+type family SMapUnion (l :: SMap a) (r :: SMap a) :: SMap a where
+  SMapUnion l r = SMapFromList (SMapToList l ++ SMapToList r)
+
+type family SMapDelete (k :: Symbol) (m :: SMap a) :: SMap a where
+  SMapDelete _k STip             = STip
+  SMapDelete k (SBin _s mk v l r) = CaseCmp (CmpSymbol k mk)
+    {- LT -} (SMapBalanceR mk v (SMapDelete k l) r)
+    {- EQ -} (SMapGlue l r)
+    {- GT -} (SMapBalanceL mk v l (SMapDelete k r))
+
+type family SMapDelete' (k :: Symbol) (m :: SMap a) :: SMap a where
+  SMapDelete' k (SBin _s mk v l r) = CaseCmp (CmpSymbol k mk)
+    {- LT -} (SMapBalanceR mk v (SMapDelete k l) r)
+    {- EQ -} (SMapGlue l r)
+    {- GT -} (SMapBalanceL mk v l (SMapDelete k r))
+
+-- intersection
+-- difference
+
+type family SMapBalanceL (k :: Symbol) (v :: Type) (l :: SMap a) (r :: SMap a) :: SMap a where
   SMapBalanceL k v STip STip
     = SBin 1 k v STip STip
 
@@ -75,7 +129,7 @@ type family SMapBalanceL (k :: Symbol) (v :: Type) (l :: SMap) (r :: SMap) :: SM
             (SBin (SMapSize lrr + SMapSize r + 1) k v lrr r)))
         (SBin (ls + SMapSize r + 1) k v (SBin ls lk lv ll (SBin lrs lrk lrv lrl lrr)) r)
 
-type family SMapBalanceR (k :: Symbol) (v :: Type) (l :: SMap) (r :: SMap) :: SMap where
+type family SMapBalanceR (k :: Symbol) (v :: a) (l :: SMap a) (r :: SMap a) :: SMap a where
   SMapBalanceR k v STip STip
     = SBin 1 k v STip STip
 
@@ -107,30 +161,35 @@ type family SMapBalanceR (k :: Symbol) (v :: Type) (l :: SMap) (r :: SMap) :: SM
             (SBin (SMapSize rlr + SMapSize rr + 1) rk rv rlr rr)))
         (SBin (SMapSize l + rs + 1) k v l (SBin rs rk rv (SBin rls rlk rlv rll rlr) rr))
 
-{-
-type family SSetInsert (a :: Symbol) (s :: SSet Symbol) :: SSet Symbol where
-  SSetInsert a STip           = SBin 1 a STip STip
-  SSetInsert a (SBin n v l r) = If (SElem a (SBin n v l r)) (SBin n v l r)
-    (SSetBalance
-      (If (CmpSymbol a v == LT)
-        (SBin (n+1) (SSetInsert' a l) r)
-        (SBin (n+1) l (SSetInsert' a r))))
+type family SMapGlue (l :: SMap a) (r :: SMap a) :: SMap a where
+  SMapGlue STip                  STip                  = STip
+  SMapGlue STip                  r                     = r
+  SMapGlue l                     STip                  = l
+  SMapGlue (SBin ls lk lv ll lr) (SBin rs rk rv rl rr) = If (CmpNat ls rs == GT)
+    (SMapGlueR (SMapMaxViewSure lk lv ll lr) (SBin rs rk rv rl rr))
+    (SMapGlueL (SBin ls lk lv ll lr) (SMapMinViewSure rk rv rl rr))
 
-type family SSetInsert' (a :: Symbol) (s :: SSet Symbol) :: SSet Symbol where
-  SSetInsert' a (SBin n v l r) = 
+data SMapView a = SMapView Symbol a (SMap a)
 
-type family SSetBalance (s :: SSet Symbol) :: SSet Symbol where
-  SSetBalance s = s
+type family SMapGlueR (l :: SMapView a) (r :: SMap a) :: SMap a where
+  SMapGlueR ('SMapView k v l) r = SMapBalanceR k v l r
 
-type family SSetSize (s :: SSet k) :: Nat where
-  SSetSize STip           = 0
-  SSetSize (SBin n v l r) = n
+type family SMapGlueL (l :: SMap a) (r :: SMapView a) :: SMap a where
+  SMapGlueL l ('SMapView k v r) = SMapBalanceL k v l r
 
-type family SElem (a :: Symbol) (s :: SSet Symbol) :: Bool where
-  SElem a STip           = False
-  SElem a (SBin n a l r) = True
-  SElem a (SBin n v l r) = If (CmpSymbol a v == LT) (SElem a l) (SElem a r)
--}
+type family SMapMaxViewSure (k :: Symbol) (v :: a) (l :: SMap a) (r :: SMap a) :: SMapView a where
+  SMapMaxViewSure k v l STip                  = 'SMapView k v l
+  SMapMaxViewSure k v l (SBin _s rk rv rl rr) = SMapMaxViewSure_ k v l (SMapMaxViewSure rk rv rl rr)
+
+type family SMapMaxViewSure_ (k :: Symbol) (v :: a) (l :: SMap a) (view :: SMapView a) :: SMapView a where
+  SMapMaxViewSure_ k v l ('SMapView km vm r) = 'SMapView km vm (SMapBalanceL k v l r)
+
+type family SMapMinViewSure (k :: Symbol) (v :: a) (l :: SMap a) (r :: SMap a) :: SMapView a where
+  SMapMinViewSure k v STip                  r = 'SMapView k v r
+  SMapMinViewSure k v (SBin _s lk lv ll lr) r = SMapMinViewSure_ k v (SMapMinViewSure lk lv ll lr) r
+
+type family SMapMinViewSure_ (k :: Symbol) (v :: a) (view :: SMapView a) (r :: SMap a) :: SMapView a where
+  SMapMinViewSure_ k v ('SMapView km vm l) r = 'SMapView km vm (SMapBalanceL k v l r)
 
 type family If (b :: Bool) (x :: k) (y :: k) :: k where
   If True  x y = x
@@ -156,6 +215,14 @@ type family CaseCmp (o :: Ordering) (lt :: k) (eq :: k) (gt :: k) :: k where
   CaseCmp LT lt eq gt = lt
   CaseCmp EQ lt eq gt = eq
   CaseCmp GT lt eq gt = gt
+
+type family CaseCmpNE (o :: Ordering) (lt :: k) (gt :: k) :: k where
+  CaseCmpNE LT lt gt = lt
+  CaseCmpNE GT lt gt = gt
+
+type family (xs :: [k]) ++ (ys :: [k]) :: [k] where
+  '[] ++ ys    = ys
+  (x:xs) ++ ys = x : (xs ++ ys)
 {-
 data SSet (n :: Nat) v l r
 
