@@ -1,5 +1,6 @@
 module Data.HSet where
 
+{-
 import Prelude hiding (lookup, map, null)
 import Data.Kind (Constraint)
 import Data.HashMap.Strict (HashMap)
@@ -403,4 +404,5 @@ instance Monoid (HSet '[]) where
 
 instance (HFoldr (H Eq as) as, HFoldr (H Hashable as) as) => Hashable (HSet as) where
   hashWithSalt = hfoldr @(H Hashable as) (flip hashWithSalt)
+-}
 -}

@@ -48,10 +48,11 @@ library
     import:           language, common-deps, warnings
     hs-source-dirs:   src
     exposed-modules:
-      , Data.HSet
       , Control.Monad.SquareHole
+      , Data.HSet
+      , Data.Type.Ord.Instances
+      , Data.Type.Map
     build-depends:
-    --   , constraints
       , ghc-prim
       , hashable
       , mtl
