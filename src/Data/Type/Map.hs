@@ -14,6 +14,7 @@ Type level Data.Map.
 Keys can be any type that has a type instance for 'Compare'.
 -}
 module Data.Type.Map
+  {-
   ( -- * Construction
     Map(..)
   , Empty, Singleton
@@ -46,7 +47,7 @@ module Data.Type.Map
   , ToList, Keys, Elems
     -- * Utilities for making Compare instances
   , type (<>)
-  ) where
+  ) -} where
 
 import Data.Type.Bool
 import Data.Type.Equality
@@ -57,8 +58,10 @@ import Data.Proxy
 
 -- | Type level balanced weighted binary trees.
 -- It's Data.Map at the type level.
-data Map k v = Tip | Bin Nat k v (Map k v) (Map k v)
+data Map k v
+  = Tip | Bin Nat k v (Map k v) (Map k v)
 
+{-
 ------ Construction
 
 -- | The empty map.
@@ -221,6 +224,7 @@ type Elems (m :: Map k v) = FoldrWithKey ElemsFun ('[] :: [v]) m
 data ElemsFun
 type instance FoldrWithKeyFun ElemsFun k v acc = (v : acc)
 
+-}
 ------ Utilities for making Compare instances
 
 -- | Type level Semigroup instance for Ordering
@@ -229,6 +233,7 @@ type instance LT <> _r = LT
 type instance EQ <> r  = r
 type instance GT <> _r = GT
 
+{-
 ------ Internal Implementation
 
 ---- Internals for: Insertion/Update/Deletion
@@ -374,3 +379,4 @@ type family SortedAssocListDifference (xs :: [(Symbol, a)]) (ys :: [(Symbol, b)]
     {- LT -} ('(xk,xv) : SortedAssocListDifference xs ('(yk,yv):ys))
     {- EQ -} (SortedAssocListDifference xs ys)
     {- GT -} (SortedAssocListDifference ('(xk,xv):xs) ys)
+-}
