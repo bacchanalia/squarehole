@@ -14,10 +14,11 @@
       "x86_64-linux"    "aarch64-linux"
       "x86_64-darwin"   "aarch64-dawrin"
       "x86_64-windows"
-    ] (system: with nixpkgs.legacyPackages.${system}; {
+    ] (system: with nixpkgs.legacyPackages.${system}; let
+      pkg = haskell.packages.ghc981.callCabal2nix "squarehole" ./. {};
+    in {
       packages = {
-        haskellPackages.squarehole = haskellPackages.callCabal2nix "squarehole" ./. {};
-        default = self.packages.${system}.haskellPackages.squarehole;
+        default = pkg;
       };
 
       devShells.default = self.packages.${system}.default.env;

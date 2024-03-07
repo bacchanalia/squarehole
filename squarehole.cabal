@@ -36,9 +36,10 @@ common language
       , UndecidableInstances
       , RankNTypes
       , UndecidableSuperClasses
+      , NoStarIsType
 
 common common-deps
-    build-depends:    base ^>=4.17.2.1
+    build-depends:    base
 
 common warnings
     ghc-options: -Wall
@@ -50,7 +51,7 @@ library
       , Data.HSet
       , Control.Monad.SquareHole
     build-depends:
-      , constraints
+    --   , constraints
       , ghc-prim
       , hashable
       , mtl
