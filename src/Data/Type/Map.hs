@@ -25,15 +25,15 @@ module Data.Type.Map
   , Member, Lookup, Lookup', Size
     -- * Binary set-like operations
   , Union, Intersection, Difference
-    -- * Folding and Mapping
+    -- * Folding, Mapping, Filtering
   , FoldrWithKey, FoldrWithKeyFun
   , MapWithKey, MapWithKeyFun
+  , FilterWithKey, FilterWithKeyFun
     -- * Conversion
   , ToList, Keys, Elems
     -- * Utilities for making Compare instances
   , type (<>)
-  )
-  where
+  ) where
 
 import Data.Type.Bool
 import Data.Type.Equality
@@ -167,7 +167,7 @@ type family Intersection (l :: Map k v) (r :: Map k x) :: Map k v where
 type family Difference (l :: Map k v) (r :: Map k v) :: Map k v where
   Difference l r = FromList (SortedAssocListDifference (ToList l) (ToList r))
 
------- Folding and Mapping
+------ Folding, Mapping, Filtering
 
 type family FoldrWithKey (f :: ix) (z :: b) (m :: Map k a) :: b where
   FoldrWithKey f z Tip              = z
@@ -181,22 +181,30 @@ type family MapWithKey (f :: ix) (m :: Map k a) :: Map k b where
 
 type family MapWithKeyFun (f :: ix) (key :: k) (val :: v) :: b
 
+type family FilterWithKey (f :: ix) (m :: Map k a) :: Map k a where
+  FilterWithKey f Tip             = Tip
+  FilterWithKey f (Bin s k v l r) = If (FilterWithKeyFun f k v)
+    (Link k v (FilterWithKey f l) (FilterWithKey f r))
+    (Link2 (FilterWithKey f l) (FilterWithKey f r))
+
+type family FilterWithKeyFun (f :: ix) (key :: k) (val :: v) :: Bool
+
 ------ Conversion
 
 -- | Convert a map to sorted a list of key/value pairs.
 type ToList (m :: Map k v) = FoldrWithKey ToListFun ('[] :: [(k, v)]) m
-type instance FoldrWithKeyFun ToListFun k v acc = ('(k, v) : acc)
 data ToListFun
+type instance FoldrWithKeyFun ToListFun k v acc = ('(k, v) : acc)
 
 -- | Get a sorted list of keys from a map.
 type Keys (m :: Map k v) = FoldrWithKey KeysFun ('[] :: [k]) m
-type instance FoldrWithKeyFun KeysFun k _v acc = (k : acc)
 data KeysFun
+type instance FoldrWithKeyFun KeysFun k _v acc = (k : acc)
 
 -- | Get a list of elements in order of their keys from a map.
 type Elems (m :: Map k v) = FoldrWithKey ElemsFun ('[] :: [v]) m
-type instance FoldrWithKeyFun ElemsFun k v acc = (v : acc)
 data ElemsFun
+type instance FoldrWithKeyFun ElemsFun k v acc = (v : acc)
 
 ------ Utilities for making Compare instances
 
@@ -303,6 +311,32 @@ type family MinViewSure (key :: k) (val :: v) (l :: Map k v) (r :: Map k v) :: V
 
 type family MinViewSure_ (key :: k) (val :: v) (view :: View k v) (r :: Map k v) :: View k v where
   MinViewSure_ k v ('View km vm l) r = 'View km vm (BalanceL k v l r)
+
+---- Internal for: Folding, Mapping, Filtering
+
+type family Link (key :: k) (val :: v) (l :: Map k v) (r :: Map k v) :: Map k v where
+  Link k v Tip                  r                    = InsertMin k v r
+  Link k v l                    Tip                  = InsertMax k v l
+  Link k v (Bin ls lk lv ll lr) (Bin rs rk rv rl rr) =
+    If (Compare (3 * ls) rs == LT) (BalanceL rk rv (Link k v (Bin ls lk lv ll lr) rl) rr) (
+    If (Compare (3 * rs) ls == LT) (BalanceR lk lv ll (Link k v lr (Bin rs rk rv rl rr))) (
+    {- Otherwise #-}               (Bin (ls + rs + 1) k v (Bin ls lk lv ll lr) (Bin rs rk rv rl rr))))
+
+type family Link2 (l :: Map k v) (r :: Map k v) :: Map k v where
+  Link2 Tip r   = r
+  Link2 l   Tip = l
+  Link2 (Bin ls lk lv ll lr) (Bin rs rk rv rl rr) =
+    If (Compare (3 * ls) rs == LT) (BalanceL rk rv (Link2 (Bin ls lk lv ll lr) rl) rr) (
+    If (Compare (3 * rs) ls == LT) (BalanceR lk lv ll (Link2 lr (Bin rs rk rv rl rr))) (
+    {- Otherwise #-}               (Glue (Bin ls lk lv ll lr) (Bin rs rk rv rl rr))))
+
+type family InsertMin (key :: k) (val :: v) (m :: Map k v) :: Map k v where
+  InsertMin k v Tip                = Singleton k v
+  InsertMin k v (Bin _s mk mv l r) = BalanceL mk mv (InsertMin k v l) r
+
+type family InsertMax (key :: k) (val :: v) (m :: Map k v) :: Map k v where
+  InsertMax k v Tip                = Singleton k v
+  InsertMax k v (Bin _s mk mv l r) = BalanceR mk mv l (InsertMax k v r)
 
 ---- Internal for: Binary set-like operations
 
