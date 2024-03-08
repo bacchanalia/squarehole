@@ -11,9 +11,9 @@ Portability : GHC only
 
 module Data.Type.Ord.Instances where
 
-import Data.Type.Map (type (<>))
-
 import Data.Type.Ord
+
+import Data.Type.Semigroup
 
 type instance Compare () () = EQ
 type instance Compare '(a1, a2) '(b1, b2) = Compare a1 b1 <> Compare a2 b2

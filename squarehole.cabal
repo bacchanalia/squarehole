@@ -52,6 +52,8 @@ library
       , Data.HSet
       , Data.Type.Ord.Instances
       , Data.Type.Map
+      , Data.Type.Function
+      , Data.Type.Semigroup
     build-depends:
       , ghc-prim
       , hashable
