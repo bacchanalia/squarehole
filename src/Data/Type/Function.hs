@@ -39,7 +39,8 @@ data AEnd
 
 data ADrop
 data AUse
-data ARotK   = ARot Nat
+data ARotL
+data ARotR
 data ARepK a = ARep Nat a
 data AThen a
 type family Apply (fun :: f) (acc :: as) :: b
@@ -54,7 +55,8 @@ type family ArgAcc0 (fun :: f) (args :: argdesc) (acc :: as) :: b where
 
   ArgAcc0 f (ADrop      :$ args) acc = ArgAcc0 f args acc
   ArgAcc0 f (AUse       :$ args) acc = ArgAcc0 f args acc
-  ArgAcc0 f (ARot       :$ args) acc = ArgAcc0 f args acc
+  ArgAcc0 f (ARotL      :$ args) acc = ArgAcc0 f args acc
+  ArgAcc0 f (ARotR      :$ args) acc = ArgAcc0 f args acc
   ArgAcc0 f (a          :$ args) acc = ArgAcc0 f args (a :$ acc)
 
 type instance App1 (f :$ args) x1 = ArgAcc1 f args AEnd x1
@@ -69,7 +71,8 @@ type family ArgAcc1 (fun :: f) (args :: argdesc) (acc :: as) (x1 :: a1) :: b whe
 
   ArgAcc1 f (ADrop      :$ args) acc x1 = ArgAcc0 f args acc
   ArgAcc1 f (AUse       :$ args) acc x1 = ArgAcc0 f args (x1 :$ acc)
-  ArgAcc1 f (ARot       :$ args) acc x1 = ArgAcc1 f args acc         x1
+  ArgAcc1 f (ARotL      :$ args) acc x1 = ArgAcc1 f args acc         x1
+  ArgAcc1 f (ARotR      :$ args) acc x1 = ArgAcc1 f args acc         x1
   ArgAcc1 f (a          :$ args) acc x1 = ArgAcc1 f args (a  :$ acc) x1
 
 type instance App2 (f :$ args) x1 x2 = ArgAcc2 f args AEnd x1 x2
@@ -84,7 +87,8 @@ type family ArgAcc2 (fun :: f) (args :: argdesc) (acc :: as) (x1 :: a1) (x2 :: a
 
   ArgAcc2 f (ADrop      :$ args) acc x1 x2 = ArgAcc1 f args acc         x2
   ArgAcc2 f (AUse       :$ args) acc x1 x2 = ArgAcc1 f args (x1 :$ acc) x2
-  ArgAcc2 f (ARot       :$ args) acc x1 x2 = ArgAcc2 f args acc         x2 x1
+  ArgAcc2 f (ARotL      :$ args) acc x1 x2 = ArgAcc2 f args acc         x2 x1
+  ArgAcc2 f (ARotR      :$ args) acc x1 x2 = ArgAcc2 f args acc         x2 x1
   ArgAcc2 f (a          :$ args) acc x1 x2 = ArgAcc2 f args (a  :$ acc) x1 x2
 
 type instance App3 (f :$ args) x1 x2 x3 = ArgAcc3 f args AEnd x1 x2 x3
@@ -99,7 +103,8 @@ type family ArgAcc3 (fun :: f) (args :: argdesc) (acc :: as) (x1 :: a1) (x2 :: a
 
   ArgAcc3 f (ADrop      :$ args) acc x1 x2 x3 = ArgAcc2 f args acc         x2 x3
   ArgAcc3 f (AUse       :$ args) acc x1 x2 x3 = ArgAcc2 f args (x1 :$ acc) x2 x3
-  ArgAcc3 f (ARot       :$ args) acc x1 x2 x3 = ArgAcc3 f args acc         x2 x3 x1
+  ArgAcc3 f (ARotL      :$ args) acc x1 x2 x3 = ArgAcc3 f args acc         x2 x3 x1
+  ArgAcc3 f (ARotR      :$ args) acc x1 x2 x3 = ArgAcc3 f args acc         x3 x1 x2
   ArgAcc3 f (a          :$ args) acc x1 x2 x3 = ArgAcc3 f args (a  :$ acc) x1 x2 x3
 
 type instance App4 (f :$ args) x1 x2 x3 x4 = ArgAcc4 f args AEnd x1 x2 x3 x4
@@ -114,7 +119,8 @@ type family ArgAcc4 (fun :: f) (args :: argdesc) (acc :: as) (x1 :: a1) (x2 :: a
 
   ArgAcc4 f (ADrop      :$ args) acc x1 x2 x3 x4 = ArgAcc3 f args acc         x2 x3 x4
   ArgAcc4 f (AUse       :$ args) acc x1 x2 x3 x4 = ArgAcc3 f args (x1 :$ acc) x2 x3 x4
-  ArgAcc4 f (ARot       :$ args) acc x1 x2 x3 x4 = ArgAcc4 f args acc         x2 x3 x4 x1
+  ArgAcc4 f (ARotL      :$ args) acc x1 x2 x3 x4 = ArgAcc4 f args acc         x2 x3 x4 x1
+  ArgAcc4 f (ARotR      :$ args) acc x1 x2 x3 x4 = ArgAcc4 f args acc         x4 x1 x2 x3
   ArgAcc4 f (a          :$ args) acc x1 x2 x3 x4 = ArgAcc4 f args (a  :$ acc) x1 x2 x3 x4
 
 type instance App5 (f :$ args) x1 x2 x3 x4 x5 = ArgAcc5 f args AEnd x1 x2 x3 x4 x5
@@ -129,7 +135,8 @@ type family ArgAcc5 (fun :: f) (args :: argdesc) (acc :: as) (x1 :: a1) (x2 :: a
 
   ArgAcc5 f (ADrop      :$ args) acc x1 x2 x3 x4 x5 = ArgAcc4 f args acc         x2 x3 x4 x5
   ArgAcc5 f (AUse       :$ args) acc x1 x2 x3 x4 x5 = ArgAcc4 f args (x1 :$ acc) x2 x3 x4 x5
-  ArgAcc5 f (ARot       :$ args) acc x1 x2 x3 x4 x5 = ArgAcc5 f args (x1 :$ acc) x2 x3 x4 x5 x1
+  ArgAcc5 f (ARotL      :$ args) acc x1 x2 x3 x4 x5 = ArgAcc5 f args acc         x2 x3 x4 x5 x1
+  ArgAcc5 f (ARotR      :$ args) acc x1 x2 x3 x4 x5 = ArgAcc5 f args acc         x5 x1 x2 x3 x4
   ArgAcc5 f (a          :$ args) acc x1 x2 x3 x4 x5 = ArgAcc5 f args (a  :$ acc) x1 x2 x3 x4 x5
 
 type instance App6 (f :$ args) x1 x2 x3 x4 x5 x6 = ArgAcc6 f args AEnd x1 x2 x3 x4 x5 x6
@@ -144,7 +151,8 @@ type family ArgAcc6 (fun :: f) (args :: argdesc) (acc :: as) (x1 :: a1) (x2 :: a
 
   ArgAcc6 f (ADrop      :$ args) acc x1 x2 x3 x4 x5 x6 = ArgAcc5 f args acc         x2 x3 x4 x5 x6
   ArgAcc6 f (AUse       :$ args) acc x1 x2 x3 x4 x5 x6 = ArgAcc5 f args (x1 :$ acc) x2 x3 x4 x5 x6
-  ArgAcc6 f (ARot       :$ args) acc x1 x2 x3 x4 x5 x6 = ArgAcc5 f args acc         x2 x3 x4 x5 x6 x1
+  ArgAcc6 f (ARotL      :$ args) acc x1 x2 x3 x4 x5 x6 = ArgAcc5 f args acc         x2 x3 x4 x5 x6 x1
+  ArgAcc6 f (ARotR      :$ args) acc x1 x2 x3 x4 x5 x6 = ArgAcc5 f args acc         x6 x1 x2 x3 x4 x5
   ArgAcc6 f (a          :$ args) acc x1 x2 x3 x4 x5 x6 = ArgAcc6 f args (a  :$ acc) x1 x2 x3 x4 x5 x6
 
 type instance App7 (f :$ args) x1 x2 x3 x4 x5 x6 x7 = ArgAcc7 f args AEnd x1 x2 x3 x4 x5 x6 x7
@@ -159,7 +167,8 @@ type family ArgAcc7 (fun :: f) (args :: argdesc) (acc :: as) (x1 :: a1) (x2 :: a
 
   ArgAcc7 f (ADrop      :$ args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc6 f args acc         x2 x3 x4 x5 x6 x7
   ArgAcc7 f (AUse       :$ args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc6 f args (x1 :$ acc) x2 x3 x4 x5 x6 x7
-  ArgAcc7 f (ARot       :$ args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc6 f args acc         x2 x3 x4 x5 x6 x7 x1
+  ArgAcc7 f (ARotL      :$ args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc6 f args acc         x2 x3 x4 x5 x6 x7 x1
+  ArgAcc7 f (ARotR      :$ args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc6 f args acc         x7 x1 x2 x3 x4 x5 x6
   ArgAcc7 f (a          :$ args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc7 f args (a  :$ acc) x1 x2 x3 x4 x5 x6 x7
 
 type instance App1 '(x1, x2) f = App2 f x1 x2
