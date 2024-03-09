@@ -37,6 +37,7 @@ common language
       , RankNTypes
       , UndecidableSuperClasses
       , NoStarIsType
+      , AllowAmbiguousTypes
 
 common common-deps
     build-depends:    base
