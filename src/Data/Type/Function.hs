@@ -242,10 +242,12 @@ type instance App5 '(,,,) x1 x2 x3 x4 x5 = '(x1, x2, x3, x4, x5)
 type instance App6 '(,,,,) x1 x2 x3 x4 x5 x6 = '(x1, x2, x3, x4, x5, x6)
 type instance App7 '(,,,,,) x1 x2 x3 x4 x5 x6 x7 = '(x1, x2, x3, x4, x5, x6, x7)
 
+{-
 type instance App1 Just x = Just x
 type instance App2 (:) x xs = x : xs
 type instance App1 Left  x = Left  x
 type instance App1 Right x = Right x
+-}
 
 data a :+ b
 type instance App2 (:+) a b = a + b

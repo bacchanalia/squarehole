@@ -69,6 +69,9 @@ import Data.Type.Semigroup
 -- It's Data.Map at the type level.
 data Map k a = Tip | Bin Nat k a (Map k a) (Map k a)
 
+data MkBin
+type instance App5 MkBin s k x l r = Bin s k x l r
+
 -- | The empty map.
 type Empty = Tip
 
@@ -171,16 +174,14 @@ type family Adjust (f :: a_a) (key :: k) (map :: Map k a) :: Map k a where
 type family AdjustWithKey (f :: k_a_a) (key :: k) (map :: Map k a) :: Map k a where
   AdjustWithKey f k m = AdjustWithKey_ (KeyNotInMapErrMsg "AdjustWithKey" k m) f k m
 
-{-
 type family UpdateWithKey_ (err :: ErrorMessage) (f :: k_a_Maybe_a) (key :: k) (map :: Map k a) :: Map k a where
-  UpdateWithKey_ err f k Tip              = TypeError err
-  UpdateWithKey_ err f k (Bin s mk x l r) = Compared k mk
+  UpdateWithKey_ err f k Tip                     = TypeError err
+  UpdateWithKey_ err f k (Bin s mk (x :: a) l r) = Compared k mk
     {- LT -} (BalanceR mk x (UpdateWithKey_ err f k l) r)
-    {- EQ -} (CaseMaybe (App2 f k x)
+    {- EQ -} (CaseMaybe (App2 f k x :: Maybe a)
                 (Glue l r)
-                )
+                (MkBin :$ s :$ k :$ AUse :$ l :$ r))
     {- GT -} (BalanceL mk x l (UpdateWithKey_ err f k r))
--}
 
 ------ Querying
 
