@@ -18,6 +18,7 @@ type instance App1 Id x1 = x1
 
 type Const (x :: a) = Id :$ AThen ADrop :$ x :$ AEnd
 type AProj (n :: Nat) = Id :$ ARep (n - 1) ADrop :$ AUse :$ AEnd
+type Flip  (fun :: f) = fun :$ ARotL :$ AUse :$ ARotR :$ AThen AUse :$ AEnd
 type ATail (fun :: f) = fun :$ ADrop :$ AThen AUse :$ AEnd
 
 -- This could almost be:
@@ -178,6 +179,23 @@ type family ArgAcc7 (fun :: f) (args :: argdesc) (acc :: as) (x1 :: a1) (x2 :: a
   ArgAcc7 f (ARotL      :$ args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc6 f args acc         x2 x3 x4 x5 x6 x7 x1
   ArgAcc7 f (ARotR      :$ args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc6 f args acc         x7 x1 x2 x3 x4 x5 x6
   ArgAcc7 f (a          :$ args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc7 f args (a  :$ acc) x1 x2 x3 x4 x5 x6 x7
+
+data HUncurry f
+type instance App1 (HUncurry f) xs = Apply f xs
+
+data RHUncurry f
+type instance App1 (RHUncurry f) xs = RApply f xs
+
+data HCurry f
+type instance App1 (HCurry f) x1 = App1 f (x1 :$ AEnd)
+type instance App2 (HCurry f) x1 x2 = App1 f (x1 :$ x2 :$ AEnd)
+type instance App3 (HCurry f) x1 x2 x3 = App1 f (x1 :$ x2 :$ x3 :$ AEnd)
+type instance App4 (HCurry f) x1 x2 x3 x4 = App1 f (x1 :$ x2 :$ x3 :$ x4 :$ AEnd)
+type instance App5 (HCurry f) x1 x2 x3 x4 x5 = App1 f (x1 :$ x2 :$ x3 :$ x4 :$ x5 :$ AEnd)
+type instance App6 (HCurry f) x1 x2 x3 x4 x5 x6 = App1 f (x1 :$ x2 :$ x3 :$ x4 :$ x5 :$ x6 :$ AEnd)
+type instance App7 (HCurry f) x1 x2 x3 x4 x5 x6 x7 = App1 f (x1 :$ x2 :$ x3 :$ x4 :$ x5 :$ x6 :$ x7 :$ AEnd)
+
+type AReverse (f :: fun) = HCurry (RHUncurry f)
 
 type instance App1 '(x1, x2) f = App2 f x1 x2
 type instance App1 '(x1, x2, x3) f = App3 f x1 x2 x3
