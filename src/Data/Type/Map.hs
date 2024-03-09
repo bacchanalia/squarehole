@@ -97,7 +97,7 @@ type FromListErrMsg xs = Text "Data.Type.Map.FromList: duplicate keys in " :<>: 
 -- If a key appears more than once, the values are combined using the
 -- type instance of 'App2' indexed by 'f'.
 type family FromListWith (f :: a_a_a) (xs :: [(k, a)]) :: Map k a where
-  FromListWith f xs = FromListWithKey (ArgTail f) xs
+  FromListWith f xs = FromListWithKey (ATail f) xs
 
 ------ Operations on single elements
 
@@ -125,7 +125,7 @@ type family Insert (key :: k) (val :: a) (map :: Map k a) :: Map k a where
 -- If a key appears more than once, the values are combined using the
 -- type instance of 'App2' indexed by 'f'.
 type family InsertWith (f :: a_a_a) (key :: k) (val :: a) (map :: Map k a) :: Map k a where
-  InsertWith f k x m = InsertWithKey (ArgTail f) k x m
+  InsertWith f k x m = InsertWithKey (ATail f) k x m
 
 ---- Deletion
 
@@ -163,7 +163,7 @@ type family Replace (key :: k) (val :: x) (map :: Map k a) :: Map k a where
 -- | Updates the value of a specific key, using the type instance of 'App1' indexed by 'f'.
 -- It's a type error if the key is not in the map.
 type family Adjust (f :: a_a) (key :: k) (map :: Map k a) :: Map k a where
-  Adjust f k m = AdjustWithKey_ (KeyNotInMapErrMsg "Adjust" k m) (ArgTail f) k m
+  Adjust f k m = AdjustWithKey_ (KeyNotInMapErrMsg "Adjust" k m) (ATail f) k m
 
 -- | Updates the value of a specific key, combining it with the key using the
 -- type instance of 'App2' indexed by 'f'

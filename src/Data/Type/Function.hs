@@ -1,8 +1,6 @@
 module Data.Type.Function where
 
-import Data.Kind
 import Data.Type.Bool
-import Data.Type.Equality
 import Data.Type.Ord
 import GHC.TypeError
 import GHC.TypeLits
@@ -18,6 +16,10 @@ type family App7 (f :: ix) (x1 :: a1) (x2 :: a2) (x3 :: a3) (x4 :: a4) (x5 :: a5
 data Id
 type instance App1 Id x1 = x1
 
+type Const (x :: a) = Id :$ AThen ADrop :$ x :$ AEnd
+type AProj (n :: Nat) = Id :$ ARep (n - 1) ADrop :$ AUse :$ AEnd
+type ATail (fun :: f) = fun :$ ADrop :$ AThen AUse :$ AEnd
+
 -- This could almost be:
 -- type Error (msg :: ErrorMessage) = Const (TypeError msg)
 -- but TypeError is weird.
@@ -31,137 +33,125 @@ type instance App6 (Error msg) x1 x2 x3 x4 x5 x6 = TypeError msg
 type instance App7 (Error msg) x1 x2 x3 x4 x5 x6 x7 = TypeError msg
 
 infixr 0 :$
-type (x :: a) :$ (xs :: b) = HCons x xs
+data (x :: a) :$ (xs :: b)
 
-type Const (x :: a) = Id :$ AThen ADrop :$ x :$ HNil
---type Const (x :: a) = HCons Id (HCons (AThen ADrop) (HCons x HNil))
-type Proj (n :: Nat) = HCons Id (HCons (ARep (n - 1) ADrop) (HCons AUse HNil))
-type ArgTail (fun :: f) = HCons fun (HCons ADrop (HCons (AThen AUse) HNil))
-
-data T1
-data T2
-type instance App2 T1 x y = x
-type instance App2 T2 x y = y
+data AEnd
 
 data AUse
 data ADrop
 data ARepK a = ARep Nat a
 data AThen a
-
-data HCons a as
-data HNil
-
 type family Apply (fun :: f) (acc :: as) :: b
 
 type family ArgAcc0 (fun :: f) (args :: argdesc) (acc :: as) :: b where
-  ArgAcc0 f HNil                      acc = Apply f acc
+  ArgAcc0 f AEnd                 acc = Apply f acc
 
-  ArgAcc0 f (HCons (ARep 0 arg) args) acc = ArgAcc0 f args                                        acc
-  ArgAcc0 f (HCons (ARep 1 arg) args) acc = ArgAcc0 f (HCons arg args)                            acc
-  ArgAcc0 f (HCons (ARep n arg) args) acc = ArgAcc0 f (HCons arg (HCons (ARep (n - 1) arg) args)) acc
-  ArgAcc0 f (HCons (AThen  arg) args) acc = ArgAcc0 f args                                        acc
+  ArgAcc0 f (ARep 0 arg :$ args) acc = ArgAcc0 f args                              acc
+  ArgAcc0 f (ARep 1 arg :$ args) acc = ArgAcc0 f (arg :$ args)                     acc
+  ArgAcc0 f (ARep n arg :$ args) acc = ArgAcc0 f (arg :$ ARep (n - 1) arg :$ args) acc
+  ArgAcc0 f (AThen  arg :$ args) acc = ArgAcc0 f args                              acc
 
-  ArgAcc0 f (HCons (ADrop     ) args) acc = ArgAcc0 f args acc
-  ArgAcc0 f (HCons (AUse      ) args) acc = ArgAcc0 f args acc
-  ArgAcc0 f (HCons (a         ) args) acc = ArgAcc0 f args (HCons a  acc)
+  ArgAcc0 f (ADrop      :$ args) acc = ArgAcc0 f args acc
+  ArgAcc0 f (AUse       :$ args) acc = ArgAcc0 f args acc
+  ArgAcc0 f (a          :$ args) acc = ArgAcc0 f args (a :$ acc)
 
-type instance App1 (HCons f args) x1 = ArgAcc1 f args HNil x1
-type instance Apply f (HCons a1 HNil) = App1 f a1
+type instance App1 (f :$ args) x1 = ArgAcc1 f args AEnd x1
+type instance Apply f (a1 :$ AEnd) = App1 f a1
 type family ArgAcc1 (fun :: f) (args :: argdesc) (acc :: as) (x1 :: a1) :: b where
-  ArgAcc1 f HNil                      acc x1 = Apply f acc
+  ArgAcc1 f AEnd                 acc x1 = Apply f acc
 
-  ArgAcc1 f (HCons (ARep 0 arg) args) acc x1 = ArgAcc1 f args                                        acc x1
-  ArgAcc1 f (HCons (ARep 1 arg) args) acc x1 = ArgAcc1 f (HCons arg args)                            acc x1
-  ArgAcc1 f (HCons (ARep n arg) args) acc x1 = ArgAcc1 f (HCons arg (HCons (ARep (n - 1) arg) args)) acc x1
-  ArgAcc1 f (HCons (AThen  arg) args) acc x1 = ArgAcc1 f (HCons arg (HCons (AThen arg) args))        acc x1
+  ArgAcc1 f (ARep 0 arg :$ args) acc x1 = ArgAcc1 f args                              acc x1
+  ArgAcc1 f (ARep 1 arg :$ args) acc x1 = ArgAcc1 f (arg :$ args)                     acc x1
+  ArgAcc1 f (ARep n arg :$ args) acc x1 = ArgAcc1 f (arg :$ ARep (n - 1) arg :$ args) acc x1
+  ArgAcc1 f (AThen  arg :$ args) acc x1 = ArgAcc1 f (arg :$ AThen arg        :$ args) acc x1
 
-  ArgAcc1 f (HCons (ADrop     ) args) acc x1 = ArgAcc0 f args acc
-  ArgAcc1 f (HCons (AUse      ) args) acc x1 = ArgAcc0 f args (HCons x1 acc)
-  ArgAcc1 f (HCons (a         ) args) acc x1 = ArgAcc1 f args (HCons a  acc) x1
+  ArgAcc1 f (ADrop      :$ args) acc x1 = ArgAcc0 f args acc
+  ArgAcc1 f (AUse       :$ args) acc x1 = ArgAcc0 f args (x1 :$ acc)
+  ArgAcc1 f (a          :$ args) acc x1 = ArgAcc1 f args (a  :$ acc) x1
 
-type instance App2 (HCons f args) x1 x2 = ArgAcc2 f args HNil x1 x2
-type instance Apply f (HCons a2 (HCons a1 HNil)) = App2 f a1 a2
+type instance App2 (f :$ args) x1 x2 = ArgAcc2 f args AEnd x1 x2
+type instance Apply f (a2 :$ a1 :$ AEnd) = App2 f a1 a2
 type family ArgAcc2 (fun :: f) (args :: argdesc) (acc :: as) (x1 :: a1) (x2 :: a2) :: b where
-  ArgAcc2 f HNil                      acc x1 x2 = Apply f acc
+  ArgAcc2 f AEnd                 acc x1 x2 = Apply f acc
 
-  ArgAcc2 f (HCons (ARep 0 arg) args) acc x1 x2 = ArgAcc2 f args                                        acc x1 x2
-  ArgAcc2 f (HCons (ARep 1 arg) args) acc x1 x2 = ArgAcc2 f (HCons arg args)                            acc x1 x2
-  ArgAcc2 f (HCons (ARep n arg) args) acc x1 x2 = ArgAcc2 f (HCons arg (HCons (ARep (n - 1) arg) args)) acc x1 x2
-  ArgAcc2 f (HCons (AThen  arg) args) acc x1 x2 = ArgAcc2 f (HCons arg (HCons (AThen arg) args))        acc x1 x2
+  ArgAcc2 f (ARep 0 arg :$ args) acc x1 x2 = ArgAcc2 f args                              acc x1 x2
+  ArgAcc2 f (ARep 1 arg :$ args) acc x1 x2 = ArgAcc2 f (arg :$ args)                     acc x1 x2
+  ArgAcc2 f (ARep n arg :$ args) acc x1 x2 = ArgAcc2 f (arg :$ ARep (n - 1) arg :$ args) acc x1 x2
+  ArgAcc2 f (AThen  arg :$ args) acc x1 x2 = ArgAcc2 f (arg :$ AThen arg        :$ args) acc x1 x2
 
-  ArgAcc2 f (HCons (ADrop     ) args) acc x1 x2 = ArgAcc1 f args acc            x2
-  ArgAcc2 f (HCons (AUse      ) args) acc x1 x2 = ArgAcc1 f args (HCons x1 acc) x2
-  ArgAcc2 f (HCons (a         ) args) acc x1 x2 = ArgAcc2 f args (HCons a  acc) x1 x2
+  ArgAcc2 f (ADrop      :$ args) acc x1 x2 = ArgAcc1 f args acc         x2
+  ArgAcc2 f (AUse       :$ args) acc x1 x2 = ArgAcc1 f args (x1 :$ acc) x2
+  ArgAcc2 f (a          :$ args) acc x1 x2 = ArgAcc2 f args (a  :$ acc) x1 x2
 
-type instance App3 (HCons f args) x1 x2 x3 = ArgAcc3 f args HNil x1 x2 x3
-type instance Apply f (HCons a3 (HCons a2 (HCons a1 HNil))) = App3 f a1 a2 a3
+type instance App3 (f :$ args) x1 x2 x3 = ArgAcc3 f args AEnd x1 x2 x3
+type instance Apply f (a3 :$ a2 :$ a1 :$ AEnd) = App3 f a1 a2 a3
 type family ArgAcc3 (fun :: f) (args :: argdesc) (acc :: as) (x1 :: a1) (x2 :: a2) (x3 :: a3) :: b where
-  ArgAcc3 f HNil                      acc x1 x2 x3 = Apply f acc
+  ArgAcc3 f AEnd                 acc x1 x2 x3 = Apply f acc
 
-  ArgAcc3 f (HCons (ARep 0 arg) args) acc x1 x2 x3 = ArgAcc3 f args                                        acc x1 x2 x3
-  ArgAcc3 f (HCons (ARep 1 arg) args) acc x1 x2 x3 = ArgAcc3 f (HCons arg args)                            acc x1 x2 x3
-  ArgAcc3 f (HCons (ARep n arg) args) acc x1 x2 x3 = ArgAcc3 f (HCons arg (HCons (ARep (n - 1) arg) args)) acc x1 x2 x3
-  ArgAcc3 f (HCons (AThen  arg) args) acc x1 x2 x3 = ArgAcc3 f (HCons arg (HCons (AThen arg) args))        acc x1 x2 x3
+  ArgAcc3 f (ARep 0 arg :$ args) acc x1 x2 x3 = ArgAcc3 f args                              acc x1 x2 x3
+  ArgAcc3 f (ARep 1 arg :$ args) acc x1 x2 x3 = ArgAcc3 f (arg :$ args)                     acc x1 x2 x3
+  ArgAcc3 f (ARep n arg :$ args) acc x1 x2 x3 = ArgAcc3 f (arg :$ ARep (n - 1) arg :$ args) acc x1 x2 x3
+  ArgAcc3 f (AThen  arg :$ args) acc x1 x2 x3 = ArgAcc3 f (arg :$ AThen arg        :$ args) acc x1 x2 x3
 
-  ArgAcc3 f (HCons (ADrop     ) args) acc x1 x2 x3 = ArgAcc2 f args acc            x2 x3
-  ArgAcc3 f (HCons (AUse      ) args) acc x1 x2 x3 = ArgAcc2 f args (HCons x1 acc) x2 x3
-  ArgAcc3 f (HCons (a         ) args) acc x1 x2 x3 = ArgAcc3 f args (HCons a  acc) x1 x2 x3
+  ArgAcc3 f (ADrop      :$ args) acc x1 x2 x3 = ArgAcc2 f args acc         x2 x3
+  ArgAcc3 f (AUse       :$ args) acc x1 x2 x3 = ArgAcc2 f args (x1 :$ acc) x2 x3
+  ArgAcc3 f (a          :$ args) acc x1 x2 x3 = ArgAcc3 f args (a  :$ acc) x1 x2 x3
 
-type instance App4 (HCons f args) x1 x2 x3 x4 = ArgAcc4 f args HNil x1 x2 x3 x4
-type instance Apply f (HCons a4 (HCons a3 (HCons a2 (HCons a1 HNil)))) = App4 f a1 a2 a3 a4
+type instance App4 (f :$ args) x1 x2 x3 x4 = ArgAcc4 f args AEnd x1 x2 x3 x4
+type instance Apply f (a4 :$ a3 :$ a2 :$ a1 :$ AEnd) = App4 f a1 a2 a3 a4
 type family ArgAcc4 (fun :: f) (args :: argdesc) (acc :: as) (x1 :: a1) (x2 :: a2) (x3 :: a3) (x4 :: a4) :: b where
-  ArgAcc4 f HNil                      acc x1 x2 x3 x4 = Apply f acc
+  ArgAcc4 f AEnd                 acc x1 x2 x3 x4 = Apply f acc
 
-  ArgAcc4 f (HCons (ARep 0 arg) args) acc x1 x2 x3 x4 = ArgAcc4 f args                                        acc x1 x2 x3 x4
-  ArgAcc4 f (HCons (ARep 1 arg) args) acc x1 x2 x3 x4 = ArgAcc4 f (HCons arg args)                            acc x1 x2 x3 x4
-  ArgAcc4 f (HCons (ARep n arg) args) acc x1 x2 x3 x4 = ArgAcc4 f (HCons arg (HCons (ARep (n - 1) arg) args)) acc x1 x2 x3 x4
-  ArgAcc4 f (HCons (AThen  arg) args) acc x1 x2 x3 x4 = ArgAcc4 f (HCons arg (HCons (AThen arg) args))        acc x1 x2 x3 x4
+  ArgAcc4 f (ARep 0 arg :$ args) acc x1 x2 x3 x4 = ArgAcc4 f args                              acc x1 x2 x3 x4
+  ArgAcc4 f (ARep 1 arg :$ args) acc x1 x2 x3 x4 = ArgAcc4 f (arg :$ args)                     acc x1 x2 x3 x4
+  ArgAcc4 f (ARep n arg :$ args) acc x1 x2 x3 x4 = ArgAcc4 f (arg :$ ARep (n - 1) arg :$ args) acc x1 x2 x3 x4
+  ArgAcc4 f (AThen  arg :$ args) acc x1 x2 x3 x4 = ArgAcc4 f (arg :$ AThen arg        :$ args) acc x1 x2 x3 x4
 
-  ArgAcc4 f (HCons (ADrop     ) args) acc x1 x2 x3 x4 = ArgAcc3 f args acc            x2 x3 x4
-  ArgAcc4 f (HCons (AUse      ) args) acc x1 x2 x3 x4 = ArgAcc3 f args (HCons x1 acc) x2 x3 x4
-  ArgAcc4 f (HCons (a         ) args) acc x1 x2 x3 x4 = ArgAcc4 f args (HCons a  acc) x1 x2 x3 x4
+  ArgAcc4 f (ADrop      :$ args) acc x1 x2 x3 x4 = ArgAcc3 f args acc         x2 x3 x4
+  ArgAcc4 f (AUse       :$ args) acc x1 x2 x3 x4 = ArgAcc3 f args (x1 :$ acc) x2 x3 x4
+  ArgAcc4 f (a          :$ args) acc x1 x2 x3 x4 = ArgAcc4 f args (a  :$ acc) x1 x2 x3 x4
 
-type instance App5 (HCons f args) x1 x2 x3 x4 x5 = ArgAcc5 f args HNil x1 x2 x3 x4 x5
-type instance Apply f (HCons a5 (HCons a4 (HCons a3 (HCons a2 (HCons a1 HNil))))) = App5 f a1 a2 a3 a4 a5
+type instance App5 (f :$ args) x1 x2 x3 x4 x5 = ArgAcc5 f args AEnd x1 x2 x3 x4 x5
+type instance Apply f (a5 :$ a4 :$ a3 :$ a2 :$ a1 :$ AEnd) = App5 f a1 a2 a3 a4 a5
 type family ArgAcc5 (fun :: f) (args :: argdesc) (acc :: as) (x1 :: a1) (x2 :: a2) (x3 :: a3) (x4 :: a4) (x5 :: a5) :: b where
-  ArgAcc5 f HNil                      acc x1 x2 x3 x4 x5 = Apply f acc
+  ArgAcc5 f AEnd                 acc x1 x2 x3 x4 x5 = Apply f acc
 
-  ArgAcc5 f (HCons (ARep 0 arg) args) acc x1 x2 x3 x4 x5 = ArgAcc5 f args                                        acc x1 x2 x3 x4 x5
-  ArgAcc5 f (HCons (ARep 1 arg) args) acc x1 x2 x3 x4 x5 = ArgAcc5 f (HCons arg args)                            acc x1 x2 x3 x4 x5
-  ArgAcc5 f (HCons (ARep n arg) args) acc x1 x2 x3 x4 x5 = ArgAcc5 f (HCons arg (HCons (ARep (n - 1) arg) args)) acc x1 x2 x3 x4 x5
-  ArgAcc5 f (HCons (AThen  arg) args) acc x1 x2 x3 x4 x5 = ArgAcc5 f (HCons arg (HCons (AThen arg) args))        acc x1 x2 x3 x4 x5
+  ArgAcc5 f (ARep 0 arg :$ args) acc x1 x2 x3 x4 x5 = ArgAcc5 f args                              acc x1 x2 x3 x4 x5
+  ArgAcc5 f (ARep 1 arg :$ args) acc x1 x2 x3 x4 x5 = ArgAcc5 f (arg :$ args)                     acc x1 x2 x3 x4 x5
+  ArgAcc5 f (ARep n arg :$ args) acc x1 x2 x3 x4 x5 = ArgAcc5 f (arg :$ ARep (n - 1) arg :$ args) acc x1 x2 x3 x4 x5
+  ArgAcc5 f (AThen  arg :$ args) acc x1 x2 x3 x4 x5 = ArgAcc5 f (arg :$ AThen arg        :$ args) acc x1 x2 x3 x4 x5
 
-  ArgAcc5 f (HCons (ADrop     ) args) acc x1 x2 x3 x4 x5 = ArgAcc4 f args acc            x2 x3 x4 x5
-  ArgAcc5 f (HCons (AUse      ) args) acc x1 x2 x3 x4 x5 = ArgAcc4 f args (HCons x1 acc) x2 x3 x4 x5
-  ArgAcc5 f (HCons (a         ) args) acc x1 x2 x3 x4 x5 = ArgAcc5 f args (HCons a  acc) x1 x2 x3 x4 x5
+  ArgAcc5 f (ADrop      :$ args) acc x1 x2 x3 x4 x5 = ArgAcc4 f args acc         x2 x3 x4 x5
+  ArgAcc5 f (AUse       :$ args) acc x1 x2 x3 x4 x5 = ArgAcc4 f args (x1 :$ acc) x2 x3 x4 x5
+  ArgAcc5 f (a          :$ args) acc x1 x2 x3 x4 x5 = ArgAcc5 f args (a  :$ acc) x1 x2 x3 x4 x5
 
-type instance App6 (HCons f args) x1 x2 x3 x4 x5 x6 = ArgAcc6 f args HNil x1 x2 x3 x4 x5 x6
-type instance Apply f (HCons a6 (HCons a5 (HCons a4 (HCons a3 (HCons a2 (HCons a1 HNil)))))) = App6 f a1 a2 a3 a4 a5 a6
+type instance App6 (f :$ args) x1 x2 x3 x4 x5 x6 = ArgAcc6 f args AEnd x1 x2 x3 x4 x5 x6
+type instance Apply f (a6 :$ a5 :$ a4 :$ a3 :$ a2 :$ a1 :$ AEnd) = App6 f a1 a2 a3 a4 a5 a6
 type family ArgAcc6 (fun :: f) (args :: argdesc) (acc :: as) (x1 :: a1) (x2 :: a2) (x3 :: a3) (x4 :: a4) (x5 :: a5) (x6 :: a6) :: b where
-  ArgAcc6 f HNil                      acc x1 x2 x3 x4 x5 x6 = Apply f acc
+  ArgAcc6 f AEnd                 acc x1 x2 x3 x4 x5 x6 = Apply f acc
 
-  ArgAcc6 f (HCons (ARep 0 arg) args) acc x1 x2 x3 x4 x5 x6 = ArgAcc6 f args                                        acc x1 x2 x3 x4 x5 x6
-  ArgAcc6 f (HCons (ARep 1 arg) args) acc x1 x2 x3 x4 x5 x6 = ArgAcc6 f (HCons arg args)                            acc x1 x2 x3 x4 x5 x6
-  ArgAcc6 f (HCons (ARep n arg) args) acc x1 x2 x3 x4 x5 x6 = ArgAcc6 f (HCons arg (HCons (ARep (n - 1) arg) args)) acc x1 x2 x3 x4 x5 x6
-  ArgAcc6 f (HCons (AThen  arg) args) acc x1 x2 x3 x4 x5 x6 = ArgAcc6 f (HCons arg (HCons (AThen arg) args))        acc x1 x2 x3 x4 x5 x6
+  ArgAcc6 f (ARep 0 arg :$ args) acc x1 x2 x3 x4 x5 x6 = ArgAcc6 f args                              acc x1 x2 x3 x4 x5 x6
+  ArgAcc6 f (ARep 1 arg :$ args) acc x1 x2 x3 x4 x5 x6 = ArgAcc6 f (arg :$ args)                     acc x1 x2 x3 x4 x5 x6
+  ArgAcc6 f (ARep n arg :$ args) acc x1 x2 x3 x4 x5 x6 = ArgAcc6 f (arg :$ ARep (n - 1) arg :$ args) acc x1 x2 x3 x4 x5 x6
+  ArgAcc6 f (AThen  arg :$ args) acc x1 x2 x3 x4 x5 x6 = ArgAcc6 f (arg :$ AThen arg        :$ args) acc x1 x2 x3 x4 x5 x6
 
-  ArgAcc6 f (HCons (ADrop     ) args) acc x1 x2 x3 x4 x5 x6 = ArgAcc5 f args acc            x2 x3 x4 x5 x6
-  ArgAcc6 f (HCons (AUse      ) args) acc x1 x2 x3 x4 x5 x6 = ArgAcc5 f args (HCons x1 acc) x2 x3 x4 x5 x6
-  ArgAcc6 f (HCons (a         ) args) acc x1 x2 x3 x4 x5 x6 = ArgAcc6 f args (HCons a  acc) x1 x2 x3 x4 x5 x6
+  ArgAcc6 f (ADrop      :$ args) acc x1 x2 x3 x4 x5 x6 = ArgAcc5 f args acc         x2 x3 x4 x5 x6
+  ArgAcc6 f (AUse       :$ args) acc x1 x2 x3 x4 x5 x6 = ArgAcc5 f args (x1 :$ acc) x2 x3 x4 x5 x6
+  ArgAcc6 f (a          :$ args) acc x1 x2 x3 x4 x5 x6 = ArgAcc6 f args (a  :$ acc) x1 x2 x3 x4 x5 x6
 
-type instance App7 (HCons f args) x1 x2 x3 x4 x5 x6 x7 = ArgAcc7 f args HNil x1 x2 x3 x4 x5 x6 x7
-type instance Apply f (HCons a7 (HCons a6 (HCons a5 (HCons a4 (HCons a3 (HCons a2 (HCons a1 HNil))))))) = App7 f a1 a2 a3 a4 a5 a6 a7
+type instance App7 (f :$ args) x1 x2 x3 x4 x5 x6 x7 = ArgAcc7 f args AEnd x1 x2 x3 x4 x5 x6 x7
+type instance Apply f (a7 :$ a6 :$ a5 :$ a4 :$ a3 :$ a2 :$ a1 :$ AEnd) = App7 f a1 a2 a3 a4 a5 a6 a7
 type family ArgAcc7 (fun :: f) (args :: argdesc) (acc :: as) (x1 :: a1) (x2 :: a2) (x3 :: a3) (x4 :: a4) (x5 :: a5) (x6 :: a6) (x7 :: a7) :: b where
-  ArgAcc7 f HNil                      acc x1 x2 x3 x4 x5 x6 x7 = Apply f acc
+  ArgAcc7 f AEnd                 acc x1 x2 x3 x4 x5 x6 x7 = Apply f acc
 
-  ArgAcc7 f (HCons (ARep 0 arg) args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc7 f args                                        acc x1 x2 x3 x4 x5 x6 x7
-  ArgAcc7 f (HCons (ARep 1 arg) args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc7 f (HCons arg args)                            acc x1 x2 x3 x4 x5 x6 x7
-  ArgAcc7 f (HCons (ARep n arg) args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc7 f (HCons arg (HCons (ARep (n - 1) arg) args)) acc x1 x2 x3 x4 x5 x6 x7
-  ArgAcc7 f (HCons (AThen  arg) args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc7 f (HCons arg (HCons (AThen arg) args))        acc x1 x2 x3 x4 x5 x6 x7
+  ArgAcc7 f (ARep 0 arg :$ args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc7 f args                              acc x1 x2 x3 x4 x5 x6 x7
+  ArgAcc7 f (ARep 1 arg :$ args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc7 f (arg :$ args)                     acc x1 x2 x3 x4 x5 x6 x7
+  ArgAcc7 f (ARep n arg :$ args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc7 f (arg :$ ARep (n - 1) arg :$ args) acc x1 x2 x3 x4 x5 x6 x7
+  ArgAcc7 f (AThen  arg :$ args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc7 f (arg :$ AThen arg        :$ args) acc x1 x2 x3 x4 x5 x6 x7
 
-  ArgAcc7 f (HCons (ADrop     ) args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc6 f args acc            x2 x3 x4 x5 x6 x7
-  ArgAcc7 f (HCons (AUse      ) args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc6 f args (HCons x1 acc) x2 x3 x4 x5 x6 x7
-  ArgAcc7 f (HCons (a         ) args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc7 f args (HCons a  acc) x1 x2 x3 x4 x5 x6 x7
+  ArgAcc7 f (ADrop      :$ args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc6 f args acc         x2 x3 x4 x5 x6 x7
+  ArgAcc7 f (AUse       :$ args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc6 f args (x1 :$ acc) x2 x3 x4 x5 x6 x7
+  ArgAcc7 f (a          :$ args) acc x1 x2 x3 x4 x5 x6 x7 = ArgAcc7 f args (a  :$ acc) x1 x2 x3 x4 x5 x6 x7
 
 type instance App1 '(x1, x2) f = App2 f x1 x2
 type instance App1 '(x1, x2, x3) f = App3 f x1 x2 x3
